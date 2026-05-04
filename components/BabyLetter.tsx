@@ -10,7 +10,7 @@ const LINES = [
   "I have been on this planet for 33 days now and I have a LOT of opinions.",
   "",
   "Opinion #1: You smell like home. 10/10. Five stars. Would snuggle again.",
-  "Opinion #2: Your singing? A bop. (Even the made-up songs about diapers.)",
+  "Opinion #2: Your voice? A bop. The best. I could listen to you read the phone book and it would be the highlight of my day.",
   "Opinion #3: I have decided that 3 AM is comedy hour. You're welcome.",
   "",
   "Today is your birthday and I wanted to write you a letter, but my fine motor",
