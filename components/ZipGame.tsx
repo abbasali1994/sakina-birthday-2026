@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
@@ -118,7 +118,12 @@ export default function ZipGame() {
   const [zs, setZs] = useState<ZS | null>(null);
   const [started, setStarted] = useState(false);
   const [won, setWon] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+
+  // Refs for drag tracking — avoids stale closures in non-passive touch listener
+  const isDraggingRef = useRef(false);
+  const gridRef = useRef<HTMLDivElement>(null);
+  // Always-fresh handle so the imperative touchmove listener isn't stale
+  const handleCellClickRef = useRef<(r: number, c: number) => void>(() => {});
 
   useEffect(() => {
     const saved = loadZS();
@@ -228,6 +233,30 @@ export default function ZipGame() {
     saveZS(next);
   }
 
+  // Keep the ref pointing at the latest closure so the imperative listener is never stale
+  handleCellClickRef.current = handleCellClick;
+
+  // Non-passive touchmove on the grid container — lets us preventDefault() to block scroll
+  // while still routing each touch position to the correct cell via elementFromPoint.
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isDraggingRef.current) return;
+      e.preventDefault(); // block page scroll while drawing
+      const touch = e.touches[0];
+      const target = document.elementFromPoint(touch.clientX, touch.clientY);
+      const cellEl = (target as Element | null)?.closest("[data-cell]") as HTMLElement | null;
+      if (!cellEl) return;
+      const [r, c] = (cellEl.dataset.cell ?? "").split(",").map(Number);
+      if (!isNaN(r) && !isNaN(c)) handleCellClickRef.current(r, c);
+    };
+
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onTouchMove);
+  }, []); // runs once — reads fresh values via refs
+
   if (!zs) {
     return (
       <div className="cloud-card max-w-lg mx-auto h-48 flex items-center justify-center">
@@ -270,9 +299,20 @@ export default function ZipGame() {
       {/* grid */}
       <div className="relative flex justify-center mb-3">
         <div
+          ref={gridRef}
           className={`transition-all duration-300 ${!started ? "blur-sm pointer-events-none select-none" : ""}`}
-          onMouseLeave={() => setIsDragging(false)}
-          onMouseUp={() => setIsDragging(false)}
+          onMouseLeave={() => { isDraggingRef.current = false; }}
+          onMouseUp={() => { isDraggingRef.current = false; }}
+          onTouchStart={(e) => {
+            isDraggingRef.current = true;
+            const touch = e.touches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            const cellEl = (target as Element | null)?.closest("[data-cell]") as HTMLElement | null;
+            if (!cellEl) return;
+            const [r, c] = (cellEl.dataset.cell ?? "").split(",").map(Number);
+            if (!isNaN(r) && !isNaN(c)) handleCellClick(r, c);
+          }}
+          onTouchEnd={() => { isDraggingRef.current = false; }}
         >
           <div className="border-2 border-cocoa/40 rounded-xl overflow-hidden bg-white/30">
             {Array.from({ length: size }, (_, r) => (
@@ -291,8 +331,9 @@ export default function ZipGame() {
                   return (
                     <button
                       key={c}
-                      onMouseDown={() => { setIsDragging(true); handleCellClick(r, c); }}
-                      onMouseEnter={() => { if (isDragging) handleCellClick(r, c); }}
+                      data-cell={`${r},${c}`}
+                      onMouseDown={() => { isDraggingRef.current = true; handleCellClick(r, c); }}
+                      onMouseEnter={() => { if (isDraggingRef.current) handleCellClick(r, c); }}
                       onClick={() => handleCellClick(r, c)}
                       className={[
                         "w-10 h-10 sm:w-12 sm:h-12 relative border border-cocoa/10 transition-colors select-none cursor-pointer",
