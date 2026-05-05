@@ -117,6 +117,7 @@ export default function SudokuGame() {
   const [gs, setGs] = useState<GS | null>(null);
   const [sel, setSel] = useState<[number, number] | null>(null);
   const [won, setWon] = useState(false);
+  const [started, setStarted] = useState(false);
 
   // refs so keyboard handler always sees fresh values
   const gsR = useRef<GS | null>(null);
@@ -129,17 +130,17 @@ export default function SudokuGame() {
     const saved = loadGS();
     if (saved) {
       setGs(saved);
-      if (saved.done) setWon(true);
+      if (saved.done) { setWon(true); setStarted(true); }
     } else {
       startNew(0, null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // timer: runs only while game is active
+  // timer: runs only after Start is clicked and while game is active
   const isDone = gs?.done !== false;
   useEffect(() => {
-    if (isDone) return;
+    if (!started || isDone) return;
     const id = setInterval(() => {
       setGs((p) => {
         if (!p || p.done) return p;
@@ -149,7 +150,7 @@ export default function SudokuGame() {
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [isDone]);
+  }, [started, isDone]);
 
   // keyboard input — empty deps, reads state via refs
   useEffect(() => {
@@ -178,6 +179,7 @@ export default function SudokuGame() {
     saveGS(s);
     setSel(null);
     setWon(false);
+    setStarted(false);
   }
 
   function doEnter(n: number) {
@@ -262,6 +264,10 @@ export default function SudokuGame() {
         {gs.bestTime !== null && <Chip icon="⚡">best {fmt(gs.bestTime)}</Chip>}
       </div>
 
+      {/* grid + numpad wrapped with blur/start overlay */}
+      <div className="relative">
+        <div className={`transition-all duration-300 ${!started ? "blur-sm pointer-events-none select-none" : ""}`}>
+
       {/* grid */}
       <div className="flex justify-center mb-4">
         <div className="border-2 border-cocoa/60 rounded-lg overflow-hidden">
@@ -342,6 +348,23 @@ export default function SudokuGame() {
       <p className="text-center text-cocoa/40 text-xs">
         tap a cell · tap a number · or type 1–6 on keyboard
       </p>
+
+        </div>{/* end blur wrapper */}
+
+        {/* start overlay */}
+        {!started && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <motion.button
+              onClick={() => setStarted(true)}
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.94 }}
+              className="bg-rose text-white px-6 py-3 rounded-full text-lg font-bold shadow-xl shadow-rose/40 handwriting"
+            >
+              Start ▶
+            </motion.button>
+          </div>
+        )}
+      </div>{/* end relative */}
 
       {/* win banner */}
       <AnimatePresence>

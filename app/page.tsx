@@ -9,6 +9,7 @@ import BabyLetter from "@/components/BabyLetter";
 import HeartGame from "@/components/HeartGame";
 import BirthdayReveal from "@/components/BirthdayReveal";
 import SudokuGame from "@/components/SudokuGame";
+import ZipGame from "@/components/ZipGame";
 import CursorSparkle from "@/components/CursorSparkle";
 import LiveBabyStatus from "@/components/LiveBabyStatus";
 
@@ -231,6 +232,21 @@ export default function Page() {
           </motion.div>
         </div>
         <SudokuGame />
+      </section>
+
+      {/* ZIP */}
+      <section className="relative z-10 px-4 sm:px-6 py-12 sm:py-16 md:py-20">
+        <div className="text-center mb-6 sm:mb-10 px-2">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="inline-block bg-white/80 px-4 py-2 rounded-full handwriting text-lg sm:text-2xl text-rose border border-rose/30 max-w-full"
+          >
+            🔗 zip it up · connect the dots · fill the grid
+          </motion.div>
+        </div>
+        <ZipGame />
       </section>
 
       {/* PRESENT REVEAL */}
