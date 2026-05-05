@@ -236,26 +236,51 @@ export default function ZipGame() {
   // Keep the ref pointing at the latest closure so the imperative listener is never stale
   handleCellClickRef.current = handleCellClick;
 
-  // Non-passive touchmove on the grid container — lets us preventDefault() to block scroll
-  // while still routing each touch position to the correct cell via elementFromPoint.
+  // ALL touch handling lives here so both touchstart and touchmove are non-passive.
+  // React registers synthetic touch handlers passively at the root, meaning
+  // e.preventDefault() in onTouchStart / onTouchMove JSX props is silently ignored —
+  // the browser commits to scrolling during touchstart and nothing can stop it later.
+  // By adding imperative non-passive listeners directly on the element we can call
+  // preventDefault() before the browser locks in the scroll gesture.
   useEffect(() => {
     const el = gridRef.current;
     if (!el) return;
 
-    const onTouchMove = (e: TouchEvent) => {
-      if (!isDraggingRef.current) return;
-      e.preventDefault(); // block page scroll while drawing
-      const touch = e.touches[0];
-      const target = document.elementFromPoint(touch.clientX, touch.clientY);
-      const cellEl = (target as Element | null)?.closest("[data-cell]") as HTMLElement | null;
-      if (!cellEl) return;
-      const [r, c] = (cellEl.dataset.cell ?? "").split(",").map(Number);
-      if (!isNaN(r) && !isNaN(c)) handleCellClickRef.current(r, c);
+    const getCell = (touch: Touch): [number, number] | null => {
+      const hit = document.elementFromPoint(touch.clientX, touch.clientY);
+      const cellEl = (hit as Element | null)?.closest("[data-cell]") as HTMLElement | null;
+      if (!cellEl) return null;
+      const parts = (cellEl.dataset.cell ?? "").split(",").map(Number);
+      return parts.length === 2 && parts.every((n) => !isNaN(n))
+        ? [parts[0], parts[1]]
+        : null;
     };
 
-    el.addEventListener("touchmove", onTouchMove, { passive: false });
-    return () => el.removeEventListener("touchmove", onTouchMove);
-  }, []); // runs once — reads fresh values via refs
+    const onTouchStart = (e: TouchEvent) => {
+      e.preventDefault(); // must happen in a non-passive touchstart to block scroll
+      isDraggingRef.current = true;
+      const cell = getCell(e.touches[0]);
+      if (cell) handleCellClickRef.current(cell[0], cell[1]);
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isDraggingRef.current) return;
+      e.preventDefault();
+      const cell = getCell(e.touches[0]);
+      if (cell) handleCellClickRef.current(cell[0], cell[1]);
+    };
+
+    const onTouchEnd = () => { isDraggingRef.current = false; };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    el.addEventListener("touchmove",  onTouchMove,  { passive: false });
+    el.addEventListener("touchend",   onTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove",  onTouchMove);
+      el.removeEventListener("touchend",   onTouchEnd);
+    };
+  }, []); // runs once — all mutable values accessed through refs
 
   if (!zs) {
     return (
@@ -303,16 +328,6 @@ export default function ZipGame() {
           className={`transition-all duration-300 ${!started ? "blur-sm pointer-events-none select-none" : ""}`}
           onMouseLeave={() => { isDraggingRef.current = false; }}
           onMouseUp={() => { isDraggingRef.current = false; }}
-          onTouchStart={(e) => {
-            isDraggingRef.current = true;
-            const touch = e.touches[0];
-            const target = document.elementFromPoint(touch.clientX, touch.clientY);
-            const cellEl = (target as Element | null)?.closest("[data-cell]") as HTMLElement | null;
-            if (!cellEl) return;
-            const [r, c] = (cellEl.dataset.cell ?? "").split(",").map(Number);
-            if (!isNaN(r) && !isNaN(c)) handleCellClick(r, c);
-          }}
-          onTouchEnd={() => { isDraggingRef.current = false; }}
         >
           <div className="border-2 border-cocoa/40 rounded-xl overflow-hidden bg-white/30">
             {Array.from({ length: size }, (_, r) => (
